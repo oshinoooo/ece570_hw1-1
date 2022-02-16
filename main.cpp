@@ -41,11 +41,11 @@ int main(int argc, char* argv[]) {
     int max_disk_queue = 3;
 
     queue<string> paths;
-    paths.push("C:\\Users\\LYL\\Desktop\\assignment1\\disk.in0");
-    paths.push("C:\\Users\\LYL\\Desktop\\assignment1\\disk.in1");
-    paths.push("C:\\Users\\LYL\\Desktop\\assignment1\\disk.in2");
-    paths.push("C:\\Users\\LYL\\Desktop\\assignment1\\disk.in3");
-    paths.push("C:\\Users\\LYL\\Desktop\\assignment1\\disk.in4");
+    paths.push("..\\TestCases\\disk.in0");
+    paths.push("..\\TestCases\\disk.in1");
+    paths.push("..\\TestCases\\disk.in2");
+    paths.push("..\\TestCases\\disk.in3");
+    paths.push("..\\TestCases\\disk.in4");
 
     // --------------------
 
