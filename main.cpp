@@ -133,21 +133,17 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    // --------------------
+/*    if (argc < 3) {
+        cout << "Please enter correct arguments." << endl;
+        return 0;
+    }
 
-//    if (argc < 3) {
-//        cout << "Please enter correct arguments." << endl;
-//        return 0;
-//    }
-//
-//    int max_disk_queue = stoi(argv[1]);
-//
-//    // get paths
-//    queue<string> paths;
-//    for (int i = 2; i < argc; ++i)
-//        paths.push(argv[i]);
+    int max_disk_queue = stoi(argv[1]);
 
-    // --------------------
+    // get paths
+    queue<string> paths;
+    for (int i = 2; i < argc; ++i)
+        paths.push(argv[i]);*/
 
     int max_disk_queue = 3;
 
@@ -157,8 +153,6 @@ int main(int argc, char* argv[]) {
     paths.push("../TestCases/disk.in2");
     paths.push("../TestCases/disk.in3");
     paths.push("../TestCases/disk.in4");
-
-    // --------------------
 
     int number_of_requesters = paths.size();
 
