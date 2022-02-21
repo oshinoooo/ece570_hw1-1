@@ -7,30 +7,52 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include "thread.h"
 
 using namespace std;
 
-queue<string> readFile(const string& path) {
-    ifstream file(path);
-    if (!file.is_open())
-        return {};
+vector<queue<string>> getRequests(queue<string>& paths) {
+    vector<queue<string>> requests;
+    while (!paths.empty()) {
+        ifstream file(paths.front());
+        if (!file.is_open())
+            continue;
 
-    queue<string> out;
-    string name;
-    while (file >> name)
-        out.push(name);
+        queue<string> tracks;
+        string track;
+        while (file >> track)
+            tracks.push(track);
 
-    file.close();
-    return out;
+        file.close();
+
+        requests.push_back(tracks);
+        paths.pop();
+    }
+    return requests;
 }
 
 class DiskScheduler {
 public:
-    DiskScheduler(int max_disk_queue, int number_of_requesters) {
+    DiskScheduler(int max_disk_queue, int number_of_requesters, vector<queue<string>> requests) {
         this->current_position = 0;
         this->max_disk_queue = max_disk_queue;
         this->number_of_requesters = number_of_requesters;
         this->current_buffer_size = min(max_disk_queue, number_of_requesters);
+        this->requests = requests;
+    }
+
+    void startDiskScheduler() {
+        // start requesters' threads
+        vector<thread> threads;
+        for (int i = 0; i < requests.size(); ++i)
+            threads.push_back(thread(&DiskScheduler::sendRequest, this, i, requests[i]));
+
+        // start processor's thread
+        threads.push_back(thread(&DiskScheduler::process, this));
+
+        // wait
+        for (int i = 0; i < threads.size(); ++i)
+            threads[i].join();
     }
 
     void sendRequest(int requester_id, queue<string> tracks) {
@@ -101,9 +123,13 @@ private:
     int max_disk_queue;
     int number_of_requesters;
     int current_buffer_size;
+
     mutex m;
     condition_variable c_v;
+
     map<int, string> buffer;
+
+    vector<queue<string>> requests;
 };
 
 int main(int argc, char* argv[]) {
@@ -126,12 +152,6 @@ int main(int argc, char* argv[]) {
     int max_disk_queue = 3;
 
     queue<string> paths;
-//    paths.push("..\\TestCases\\disk.in0");
-//    paths.push("..\\TestCases\\disk.in1");
-//    paths.push("..\\TestCases\\disk.in2");
-//    paths.push("..\\TestCases\\disk.in3");
-//    paths.push("..\\TestCases\\disk.in4");
-
     paths.push("../TestCases/disk.in0");
     paths.push("../TestCases/disk.in1");
     paths.push("../TestCases/disk.in2");
@@ -142,26 +162,10 @@ int main(int argc, char* argv[]) {
 
     int number_of_requesters = paths.size();
 
-    // read requests from files
-    vector<queue<string>> requests;
-    while (!paths.empty()) {
-        requests.push_back(readFile(paths.front()));
-        paths.pop();
-    }
+    vector<queue<string>> requests = getRequests(paths);
 
-    DiskScheduler diskScheduler(max_disk_queue, number_of_requesters);
-
-    // start requesters' threads
-    vector<thread> threads;
-    for (int i = 0; i < requests.size(); ++i)
-        threads.push_back(thread(&DiskScheduler::sendRequest, &diskScheduler, i, requests[i]));
-
-    // start processor's thread
-    threads.push_back(thread(&DiskScheduler::process, &diskScheduler));
-
-    // wait
-    for (int i = 0; i < threads.size(); ++i)
-        threads[i].join();
+    DiskScheduler diskScheduler(max_disk_queue, number_of_requesters, requests);
+    diskScheduler.startDiskScheduler();
 
     return 0;
 }
