@@ -74,7 +74,7 @@ void sendRequest(int requester_id, queue<string> tracks) {
     }
 }
 
-void process() {
+void processRequest() {
     while (current_buffer_size != 0 || !buffer.empty()) {
         unique_lock<mutex> lock(m);
 
@@ -111,7 +111,7 @@ void startDiskScheduler() {
     for (int i = 0; i < requests.size(); ++i)
         threads.push_back(thread(sendRequest, i, requests[i]));
 
-    threads.push_back(thread(process));
+    threads.push_back(thread(processRequest));
 
     for (int i = 0; i < threads.size(); ++i)
         threads[i].join();
