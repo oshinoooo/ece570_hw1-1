@@ -11,6 +11,16 @@
 
 using namespace std;
 
+int current_position;
+int max_disk_queue;
+int number_of_requesters;
+int current_buffer_size;
+
+vector<queue<string>> requests;
+map<int, string> buffer;
+mutex m;
+condition_variable c_v;
+
 vector<queue<string>> getRequests(queue<string>& paths) {
     vector<queue<string>> requests;
     while (!paths.empty()) {
@@ -31,106 +41,81 @@ vector<queue<string>> getRequests(queue<string>& paths) {
     return requests;
 }
 
-class DiskScheduler {
-public:
-    DiskScheduler(int max_disk_queue, int number_of_requesters, vector<queue<string>> requests) {
-        this->current_position = 0;
-        this->max_disk_queue = max_disk_queue;
-        this->number_of_requesters = number_of_requesters;
-        this->current_buffer_size = min(max_disk_queue, number_of_requesters);
-        this->requests = requests;
-    }
+void sendRequest(int requester_id, queue<string> tracks) {
+    while (!tracks.empty()) {
+        unique_lock<mutex> lock(m);
 
-    void startDiskScheduler() {
-        // start requesters' threads
-        vector<thread> threads;
-        for (int i = 0; i < requests.size(); ++i)
-            threads.push_back(thread(&DiskScheduler::sendRequest, this, i, requests[i]));
+        function<bool()> func = [&]() {
+            if (current_buffer_size == buffer.size())
+                return false;
 
-        // start processor's thread
-        threads.push_back(thread(&DiskScheduler::process, this));
-
-        // wait
-        for (int i = 0; i < threads.size(); ++i)
-            threads[i].join();
-    }
-
-    void sendRequest(int requester_id, queue<string> tracks) {
-        while (!tracks.empty()) {
-            unique_lock<mutex> lock(m);
-
-            function<bool()> func = [&]() {
-                if (current_buffer_size == buffer.size())
-                    return false;
-
-                for (const auto& block : buffer) {
-                    if (block.first == requester_id)
-                        return false;
-                }
-
-                return true;
-            };
-
-            c_v.wait(lock, func);
-
-            buffer.insert({requester_id, tracks.front()});
-
-            cout << "requester " << requester_id << " track " << tracks.front() << endl;
-
-            tracks.pop();
-
-            if (tracks.empty()) {
-                --number_of_requesters;
-                current_buffer_size = min(max_disk_queue, number_of_requesters);
-            }
-
-            c_v.notify_all();
-        }
-    }
-
-    void process() {
-        while (current_buffer_size != 0 || !buffer.empty()) {
-            unique_lock<mutex> lock(m);
-
-            function<bool()> func = [this]() {
-                return current_buffer_size <= buffer.size();
-            };
-
-            c_v.wait(lock, func);
-
-            int requester_id;
-            int track;
-            int minDistance = INT_MAX;
             for (const auto& block : buffer) {
-                int curDistance = abs(current_position - stoi(block.second));
-                if (curDistance < minDistance) {
-                    minDistance = curDistance;
-                    requester_id = block.first;
-                    track = stoi(block.second);
-                }
+                if (block.first == requester_id)
+                    return false;
             }
 
-            cout << "service requester " << requester_id << " track " << track << endl;
+            return true;
+        };
 
-            buffer.erase(requester_id);
+        c_v.wait(lock, func);
 
-            c_v.notify_all();
+        buffer.insert({requester_id, tracks.front()});
+
+        cout << "requester " << requester_id << " track " << tracks.front() << endl;
+
+        tracks.pop();
+
+        if (tracks.empty()) {
+            --number_of_requesters;
+            current_buffer_size = min(max_disk_queue, number_of_requesters);
         }
+
+        c_v.notify_all();
     }
+}
 
-private:
-    int current_position;
-    int max_disk_queue;
-    int number_of_requesters;
-    int current_buffer_size;
+void process() {
+    while (current_buffer_size != 0 || !buffer.empty()) {
+        unique_lock<mutex> lock(m);
 
-    mutex m;
-    condition_variable c_v;
+        function<bool()> func = []() {
+            return current_buffer_size <= buffer.size();
+        };
 
-    map<int, string> buffer;
+        c_v.wait(lock, func);
 
-    vector<queue<string>> requests;
-};
+        int requester_id;
+        int track;
+        int minDistance = INT_MAX;
+        for (const auto& block : buffer) {
+            int curDistance = abs(current_position - stoi(block.second));
+            if (curDistance < minDistance) {
+                minDistance = curDistance;
+                requester_id = block.first;
+                track = stoi(block.second);
+            }
+        }
+
+        current_position = track;
+
+        cout << "service requester " << requester_id << " track " << track << endl;
+
+        buffer.erase(requester_id);
+
+        c_v.notify_all();
+    }
+}
+
+void startDiskScheduler() {
+    vector<thread> threads;
+    for (int i = 0; i < requests.size(); ++i)
+        threads.push_back(thread(sendRequest, i, requests[i]));
+
+    threads.push_back(thread(process));
+
+    for (int i = 0; i < threads.size(); ++i)
+        threads[i].join();
+}
 
 int main(int argc, char* argv[]) {
 /*    if (argc < 3) {
@@ -138,14 +123,10 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    int max_disk_queue = stoi(argv[1]);
-
     // get paths
     queue<string> paths;
     for (int i = 2; i < argc; ++i)
         paths.push(argv[i]);*/
-
-    int max_disk_queue = 3;
 
     queue<string> paths;
     paths.push("../TestCases/disk.in0");
@@ -154,12 +135,14 @@ int main(int argc, char* argv[]) {
     paths.push("../TestCases/disk.in3");
     paths.push("../TestCases/disk.in4");
 
-    int number_of_requesters = paths.size();
+    current_position = 0;
+    max_disk_queue = 3;
+//    max_disk_queue = stoi(argv[1]);
+    number_of_requesters = paths.size();
+    current_buffer_size = min(max_disk_queue, number_of_requesters);
+    requests = getRequests(paths);
 
-    vector<queue<string>> requests = getRequests(paths);
-
-    DiskScheduler diskScheduler(max_disk_queue, number_of_requesters, requests);
-    diskScheduler.startDiskScheduler();
+    startDiskScheduler();
 
     return 0;
 }
