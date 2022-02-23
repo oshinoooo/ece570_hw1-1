@@ -43,12 +43,12 @@ vector<queue<string>> getRequests(queue<string>& paths) {
 }
 
 void sendRequest(void* ptr) {
+    thread_lock(lock);
+
     long requester_id = (long)ptr;
     queue<string> tracks = requests[requester_id];
 
     while (!tracks.empty()) {
-        thread_lock(lock);
-
         while(current_buffer_size <= buffer.size() || buffer.count(requester_id)){
             thread_wait(lock, cond);
         }
@@ -65,14 +65,15 @@ void sendRequest(void* ptr) {
         }
 
         thread_broadcast(lock, cond);
-        thread_unlock(lock);
     }
+
+    thread_unlock(lock);
 }
 
 void processRequest(void* ptr) {
-    while (current_buffer_size != 0 || !buffer.empty()) {
-        thread_lock(lock);
+    thread_lock(lock);
 
+    while (current_buffer_size != 0 || !buffer.empty()) {
         while(current_buffer_size > buffer.size()){
             thread_wait(lock, cond);
         }
@@ -96,8 +97,9 @@ void processRequest(void* ptr) {
         buffer.erase(requester_id);
 
         thread_broadcast(lock, cond);
-        thread_unlock(lock);
     }
+
+    thread_unlock(lock);
 }
 
 void startDiskScheduler(void* ptr) {
