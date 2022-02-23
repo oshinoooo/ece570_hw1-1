@@ -14,7 +14,6 @@ using namespace std;
 
 unsigned int lock = 0;
 unsigned int cond = 1;
-//unsigned int cond_schedulers = 2;
 
 long current_position;
 long max_disk_queue;
@@ -23,7 +22,6 @@ long current_buffer_size;
 vector<queue<string>> requests;
 map<long, string> buffer;
 
-// OK
 vector<queue<string>> getRequests(queue<string>& paths) {
     vector<queue<string>> requests;
     while (!paths.empty()) {
@@ -45,7 +43,7 @@ vector<queue<string>> getRequests(queue<string>& paths) {
 }
 
 void sendRequest(void* ptr) {
-    long requester_id =  (long)ptr;
+    long requester_id = (long)ptr;
     queue<string> tracks = requests[requester_id];
 
     while (!tracks.empty()) {
@@ -61,13 +59,13 @@ void sendRequest(void* ptr) {
 
         tracks.pop();
 
-//        if (tracks.empty()) {
-//            --number_of_requesters;
-//            current_buffer_size = min(max_disk_queue, number_of_requesters);
-//        }
+        if (tracks.empty()) {
+            --number_of_requesters;
+            current_buffer_size = min(max_disk_queue, number_of_requesters);
+        }
 
-        thread_unlock(lock);
         thread_broadcast(lock, cond);
+        thread_unlock(lock);
     }
 }
 
@@ -97,13 +95,8 @@ void processRequest(void* ptr) {
 
         buffer.erase(requester_id);
 
-        if (requests[requester_id].empty()) {
-            --number_of_requesters;
-            current_buffer_size = min(max_disk_queue, number_of_requesters);
-        }
-
-        thread_unlock(lock);
         thread_broadcast(lock, cond);
+        thread_unlock(lock);
     }
 }
 
@@ -116,7 +109,6 @@ void startDiskScheduler(void* ptr) {
     }
 }
 
-// OK
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         cout << "Please enter correct arguments." << endl;
@@ -133,13 +125,6 @@ int main(int argc, char* argv[]) {
     number_of_requesters = paths.size();
     current_buffer_size = min(max_disk_queue, number_of_requesters);
     requests = getRequests(paths);
-
-//    for (int i = 0; i < requests.size(); ++i) {
-//        while (!requests[i].empty()) {
-//            cout << requests[i].front() << endl;
-//            requests[i].pop();
-//        }
-//    }
     
     thread_libinit(startDiskScheduler, nullptr);
     return 0;
