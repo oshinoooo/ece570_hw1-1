@@ -61,10 +61,10 @@ void sendRequest(void* ptr) {
 
         tracks.pop();
 
-        if (tracks.empty()) {
-            --number_of_requesters;
-            current_buffer_size = min(max_disk_queue, number_of_requesters);
-        }
+//        if (tracks.empty()) {
+//            --number_of_requesters;
+//            current_buffer_size = min(max_disk_queue, number_of_requesters);
+//        }
 
         thread_unlock(lock);
         thread_broadcast(lock, cond);
@@ -96,6 +96,11 @@ void processRequest(void* ptr) {
         cout << "service requester " << requester_id << " track " << track << endl;
 
         buffer.erase(requester_id);
+
+        if (requests[requester_id].empty()) {
+            --number_of_requesters;
+            current_buffer_size = min(max_disk_queue, number_of_requesters);
+        }
 
         thread_unlock(lock);
         thread_broadcast(lock, cond);

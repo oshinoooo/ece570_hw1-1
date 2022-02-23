@@ -65,10 +65,10 @@ void sendRequest(int requester_id, queue<string> tracks) {
 
         tracks.pop();
 
-        if (tracks.empty()) {
-            --number_of_requesters;
-            current_buffer_size = min(max_disk_queue, number_of_requesters);
-        }
+//        if (tracks.empty()) {
+//            --number_of_requesters;
+//            current_buffer_size = min(max_disk_queue, number_of_requesters);
+//        }
 
         c_v.notify_all();
     }
@@ -99,6 +99,8 @@ void processRequest() {
         current_position = track;
 
         cout << "service requester " << requester_id << " track " << track << endl;
+
+        if (requests[requester_id].empty())
 
         buffer.erase(requester_id);
 
