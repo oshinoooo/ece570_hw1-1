@@ -7,6 +7,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <limits.h>
+
 #include "thread.h"
 
 using namespace std;
@@ -49,10 +51,8 @@ void sendRequest(int requester_id, queue<string> tracks) {
             if (current_buffer_size == buffer.size())
                 return false;
 
-            for (const auto& block : buffer) {
-                if (block.first == requester_id)
-                    return false;
-            }
+            if (buffer.count(requester_id))
+                return false;
 
             return true;
         };

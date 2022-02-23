@@ -1,26 +1,28 @@
 #include <iostream>
 #include <vector>
-#include <fstream>
 #include <queue>
 #include <map>
-#include <functional>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <fstream>
+#include <limits.h>
+#include <utility>
+
 #include "thread.h"
+#include "interrupt.h"
 
 using namespace std;
+
+unsigned int lock = 0;
+unsigned int cond = 1;
+//unsigned int cond_schedulers = 2;
 
 int current_position;
 int max_disk_queue;
 int number_of_requesters;
 int current_buffer_size;
-
 vector<queue<string>> requests;
 map<int, string> buffer;
-mutex m;
-condition_variable c_v;
 
+// OK
 vector<queue<string>> getRequests(queue<string>& paths) {
     vector<queue<string>> requests;
     while (!paths.empty()) {
@@ -41,23 +43,17 @@ vector<queue<string>> getRequests(queue<string>& paths) {
     return requests;
 }
 
-void sendRequest(int requester_id, queue<string> tracks) {
+void sendRequest(void* pointer) {
+    pair<int, queue<string>> p = *(pair<int, queue<string>>*) pointer;
+    int requester_id = p.first;
+    queue<string> tracks = p.second;
+
     while (!tracks.empty()) {
-        unique_lock<mutex> lock(m);
+        thread_lock(lock);
 
-        function<bool()> func = [&]() {
-            if (current_buffer_size == buffer.size())
-                return false;
-
-            for (const auto& block : buffer) {
-                if (block.first == requester_id)
-                    return false;
-            }
-
-            return true;
-        };
-
-        c_v.wait(lock, func);
+        while(current_buffer_size == buffer.size() || buffer.count(requester_id)){
+            thread_wait(lock, cond);
+        }
 
         buffer.insert({requester_id, tracks.front()});
 
@@ -70,24 +66,27 @@ void sendRequest(int requester_id, queue<string> tracks) {
             current_buffer_size = min(max_disk_queue, number_of_requesters);
         }
 
-        c_v.notify_all();
+        thread_unlock(lock);
+        thread_broadcast(lock, cond);
     }
 }
 
-void processRequest() {
+void processRequest(void* ptr) {
     while (current_buffer_size != 0 || !buffer.empty()) {
-        unique_lock<mutex> lock(m);
+        thread_lock(lock);
 
-        function<bool()> func = []() {
-            return current_buffer_size <= buffer.size();
-        };
+        while(current_buffer_size > buffer.size() || (current_buffer_size != 0 || !buffer.empty())){
+            thread_wait(lock, cond);
+        }
 
-        c_v.wait(lock, func);
+        if (current_buffer_size == 0 && buffer.empty()) {
+            return;
+        }
 
         int requester_id;
         int track;
         int minDistance = INT_MAX;
-        for (const auto& block : buffer) {
+        for (const pair<int, string>& block : buffer) {
             int curDistance = abs(current_position - stoi(block.second));
             if (curDistance < minDistance) {
                 minDistance = curDistance;
@@ -102,47 +101,45 @@ void processRequest() {
 
         buffer.erase(requester_id);
 
-        c_v.notify_all();
+        thread_unlock(lock);
+        thread_broadcast(lock, cond);
     }
 }
 
-void startDiskScheduler() {
-    vector<thread> threads;
-    for (int i = 0; i < requests.size(); ++i)
-        threads.push_back(thread(sendRequest, i, requests[i]));
+void startDiskScheduler(void* ptr) {
+    thread_create(processRequest, nullptr);
 
-    threads.push_back(thread(processRequest));
-
-    for (int i = 0; i < threads.size(); ++i)
-        threads[i].join();
+    for (int i = 0; i < requests.size(); ++i) {
+        pair<int, queue<string>> p(i, requests[i]);
+        thread_create(sendRequest, &p);
+    }
 }
 
+// OK
 int main(int argc, char* argv[]) {
-    /*    if (argc < 3) {
-            cout << "Please enter correct arguments." << endl;
-            return 0;
-        }
+    if (argc < 3) {
+        cout << "Please enter correct arguments." << endl;
+        return 0;
+    }
 
-        // get paths
-        queue<string> paths;
-        for (int i = 2; i < argc; ++i)
-            paths.push(argv[i]);*/
-
+    // get paths
     queue<string> paths;
-    paths.push("../TestCases/disk.in0");
-    paths.push("../TestCases/disk.in1");
-    paths.push("../TestCases/disk.in2");
-    paths.push("../TestCases/disk.in3");
-    paths.push("../TestCases/disk.in4");
+    for (int i = 2; i < argc; ++i)
+        paths.push(argv[i]);
 
     current_position = 0;
-    max_disk_queue = 3;
-    //    max_disk_queue = stoi(argv[1]);
+    max_disk_queue = stoi(argv[1]);
     number_of_requesters = paths.size();
     current_buffer_size = min(max_disk_queue, number_of_requesters);
     requests = getRequests(paths);
 
-    startDiskScheduler();
-
+//    for (int i = 0; i < requests.size(); ++i) {
+//        while (!requests[i].empty()) {
+//            cout << requests[i].front() << endl;
+//            requests[i].pop();
+//        }
+//    }
+    
+    thread_libinit(startDiskScheduler, nullptr);
     return 0;
 }
