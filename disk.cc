@@ -16,12 +16,12 @@ unsigned int lock = 0;
 unsigned int cond = 1;
 //unsigned int cond_schedulers = 2;
 
-int current_position;
-int max_disk_queue;
-int number_of_requesters;
-int current_buffer_size;
+long current_position;
+long max_disk_queue;
+long number_of_requesters;
+long current_buffer_size;
 vector<queue<string>> requests;
-map<int, string> buffer;
+map<long, string> buffer;
 
 // OK
 vector<queue<string>> getRequests(queue<string>& paths) {
@@ -45,7 +45,7 @@ vector<queue<string>> getRequests(queue<string>& paths) {
 }
 
 void sendRequest(void* ptr) {
-    int requester_id = *(int*)ptr;
+    long requester_id =  (long)ptr;
     queue<string> tracks = requests[requester_id];
 
     while (!tracks.empty()) {
@@ -79,11 +79,11 @@ void processRequest(void* ptr) {
             thread_wait(lock, cond);
         }
 
-        int requester_id;
-        int track;
-        int minDistance = INT_MAX;
-        for (const pair<int, string>& block : buffer) {
-            int curDistance = abs(current_position - stoi(block.second));
+        long requester_id;
+        long track;
+        long minDistance = INT_MAX;
+        for (const pair<long, string>& block : buffer) {
+            long curDistance = abs(current_position - stoi(block.second));
             if (curDistance < minDistance) {
                 minDistance = curDistance;
                 requester_id = block.first;
@@ -105,9 +105,9 @@ void processRequest(void* ptr) {
 void startDiskScheduler(void* ptr) {
     thread_create(processRequest, nullptr);
 
-    for (int i = 0; i < requests.size(); ++i) {
-        int index = i;
-        thread_create(sendRequest, &index);
+    for (long i = 0; i < requests.size(); ++i) {
+        long index = i;
+        thread_create(sendRequest, (void*)index);
     }
 }
 
