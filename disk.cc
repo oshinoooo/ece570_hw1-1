@@ -5,6 +5,7 @@
 #include <fstream>
 #include <limits.h>
 #include <utility>
+#include <thread>
 
 #include "thread.h"
 #include "interrupt.h"
@@ -43,15 +44,14 @@ vector<queue<string>> getRequests(queue<string>& paths) {
     return requests;
 }
 
-void sendRequest(void* pointer) {
-    pair<int, queue<string>> p = *(pair<int, queue<string>>*) pointer;
-    int requester_id = p.first;
-    queue<string> tracks = p.second;
+void sendRequest(void* ptr) {
+    int requester_id = *(int*)ptr;
+    queue<string> tracks = requests[requester_id];
 
     while (!tracks.empty()) {
         thread_lock(lock);
 
-        while(current_buffer_size == buffer.size() || buffer.count(requester_id)){
+        while(current_buffer_size <= buffer.size() || buffer.count(requester_id)){
             thread_wait(lock, cond);
         }
 
@@ -75,12 +75,8 @@ void processRequest(void* ptr) {
     while (current_buffer_size != 0 || !buffer.empty()) {
         thread_lock(lock);
 
-        while(current_buffer_size > buffer.size() || (current_buffer_size != 0 || !buffer.empty())){
+        while(current_buffer_size > buffer.size()){
             thread_wait(lock, cond);
-        }
-
-        if (current_buffer_size == 0 && buffer.empty()) {
-            return;
         }
 
         int requester_id;
@@ -110,8 +106,8 @@ void startDiskScheduler(void* ptr) {
     thread_create(processRequest, nullptr);
 
     for (int i = 0; i < requests.size(); ++i) {
-        pair<int, queue<string>> p(i, requests[i]);
-        thread_create(sendRequest, &p);
+        int index = i;
+        thread_create(sendRequest, &index);
     }
 }
 
