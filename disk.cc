@@ -4,7 +4,6 @@
 #include <map>
 #include <fstream>
 #include <limits.h>
-#include <utility>
 #include <thread>
 
 #include "thread.h"
@@ -80,6 +79,8 @@ void sendRequest(void* ptr) {
             thread_broadcast(lock, available_buffer);
         else
             thread_broadcast(lock, full_buffer);
+
+//        cout << "========================================" << endl;
     }
 
     thread_unlock(lock);
@@ -113,6 +114,13 @@ void processRequest(void* ptr) {
 
         if (specified_buffer_size > buffer.size())
             thread_broadcast(lock, available_buffer);
+
+//        for (int i = 0; i < 5; ++i) {
+//            this_thread::sleep_for(chrono::seconds(1));
+//            cout << ".";
+//        }
+//        cout << endl;
+//        cout << "========================================" << endl;
     }
 
     thread_unlock(lock);
