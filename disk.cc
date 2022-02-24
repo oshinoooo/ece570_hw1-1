@@ -13,7 +13,8 @@
 using namespace std;
 
 unsigned int lock = 0;
-unsigned int cond = 1;
+unsigned int full_buffer = 1;
+unsigned int available_buffer = 2;
 
 long current_position;
 long max_disk_queue;
@@ -61,7 +62,7 @@ void sendRequest(void* ptr) {
 
     while (!tracks.empty()) {
         while(specified_buffer_size <= buffer.size() || buffer.count(requester_id)) {
-            thread_wait(lock, cond);
+            thread_wait(lock, available_buffer);
         }
 
         buffer.insert({requester_id, tracks.front()});
@@ -75,7 +76,10 @@ void sendRequest(void* ptr) {
             specified_buffer_size = min(max_disk_queue, number_of_requesters);
         }
 
-        thread_broadcast(lock, cond);
+        if (specified_buffer_size > buffer.size())
+            thread_broadcast(lock, available_buffer);
+        else
+            thread_broadcast(lock, full_buffer);
     }
 
     thread_unlock(lock);
@@ -86,7 +90,7 @@ void processRequest(void* ptr) {
 
     while (specified_buffer_size > 0 || !buffer.empty()) {
         while(specified_buffer_size > buffer.size()) {
-            thread_wait(lock, cond);
+            thread_wait(lock, full_buffer);
         }
 
         long requester_id;
@@ -107,7 +111,8 @@ void processRequest(void* ptr) {
 
         buffer.erase(requester_id);
 
-        thread_broadcast(lock, cond);
+        if (specified_buffer_size > buffer.size())
+            thread_broadcast(lock, available_buffer);
     }
 
     thread_unlock(lock);
