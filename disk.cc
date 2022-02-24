@@ -22,6 +22,18 @@ long specified_buffer_size;
 vector<queue<string>> requests;
 map<long, string> buffer;
 
+void printSchedulerState() {
+    cout << "----------------------------------------" << endl;
+    cout << "current_position     : " << current_position << endl;
+    cout << "number_of_requesters : " << number_of_requesters << endl;
+    cout << "specified_buffer_size: " << specified_buffer_size << endl;
+    cout << "buffer.size()        : " << buffer.size() << endl;
+    cout << "------------------------------" << endl;
+    for (const pair<long, string>& tmp : buffer)
+        cout << "requester_id: " << tmp.first << ", track: " << tmp.second << endl;
+    cout << "----------------------------------------" << endl;
+}
+
 void init(int argc, char* argv[]) {
     if (argc < 3) {
         cout << "Please enter correct arguments." << endl;
@@ -73,6 +85,8 @@ void sendRequest(void* ptr) {
         if (tracks.empty()) {
             --number_of_requesters;
             specified_buffer_size = min(max_disk_queue, number_of_requesters);
+
+//            cout << "===== " << requester_id << " quit =====" << endl;
         }
 
         if (specified_buffer_size > buffer.size())
@@ -80,7 +94,7 @@ void sendRequest(void* ptr) {
         else
             thread_broadcast(lock, full_buffer);
 
-//        cout << "========================================" << endl;
+//        printSchedulerState();
     }
 
     thread_unlock(lock);
@@ -115,12 +129,7 @@ void processRequest(void* ptr) {
         if (specified_buffer_size > buffer.size())
             thread_broadcast(lock, available_buffer);
 
-//        for (int i = 0; i < 5; ++i) {
-//            this_thread::sleep_for(chrono::seconds(1));
-//            cout << ".";
-//        }
-//        cout << endl;
-//        cout << "========================================" << endl;
+//        printSchedulerState();
     }
 
     thread_unlock(lock);
