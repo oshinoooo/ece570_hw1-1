@@ -18,12 +18,24 @@ unsigned int cond = 1;
 long current_position;
 long max_disk_queue;
 long number_of_requesters;
-long current_buffer_size;
+long specified_buffer_size;
 vector<queue<string>> requests;
 map<long, string> buffer;
 
-vector<queue<string>> getRequests(queue<string>& paths) {
-    vector<queue<string>> requests;
+void init(int argc, char* argv[]) {
+    if (argc < 3) {
+        cout << "Please enter correct arguments." << endl;
+        return;
+    }
+
+    queue<string> paths;
+    for (int i = 2; i < argc; ++i)
+        paths.push(argv[i]);
+
+    current_position = 0;
+    max_disk_queue = stoi(argv[1]);
+    number_of_requesters = paths.size();
+    specified_buffer_size = min(max_disk_queue, number_of_requesters);
     while (!paths.empty()) {
         ifstream file(paths.front());
         if (!file.is_open())
@@ -39,7 +51,6 @@ vector<queue<string>> getRequests(queue<string>& paths) {
         requests.push_back(tracks);
         paths.pop();
     }
-    return requests;
 }
 
 void sendRequest(void* ptr) {
@@ -49,7 +60,7 @@ void sendRequest(void* ptr) {
     queue<string> tracks = requests[requester_id];
 
     while (!tracks.empty()) {
-        while(current_buffer_size <= buffer.size() || buffer.count(requester_id)){
+        while(specified_buffer_size <= buffer.size() || buffer.count(requester_id)) {
             thread_wait(lock, cond);
         }
 
@@ -61,7 +72,7 @@ void sendRequest(void* ptr) {
 
         if (tracks.empty()) {
             --number_of_requesters;
-            current_buffer_size = min(max_disk_queue, number_of_requesters);
+            specified_buffer_size = min(max_disk_queue, number_of_requesters);
         }
 
         thread_broadcast(lock, cond);
@@ -73,18 +84,18 @@ void sendRequest(void* ptr) {
 void processRequest(void* ptr) {
     thread_lock(lock);
 
-    while (current_buffer_size != 0 || !buffer.empty()) {
-        while(current_buffer_size > buffer.size()){
+    while (specified_buffer_size > 0 || !buffer.empty()) {
+        while(specified_buffer_size > buffer.size()) {
             thread_wait(lock, cond);
         }
 
         long requester_id;
         long track;
-        long minDistance = INT_MAX;
+        long min_distance = INT_MAX;
         for (const pair<long, string>& block : buffer) {
-            long curDistance = abs(current_position - stoi(block.second));
-            if (curDistance < minDistance) {
-                minDistance = curDistance;
+            long cur_distance = abs(current_position - stoi(block.second));
+            if (cur_distance < min_distance) {
+                min_distance = cur_distance;
                 requester_id = block.first;
                 track = stoi(block.second);
             }
@@ -112,22 +123,7 @@ void startDiskScheduler(void* ptr) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        cout << "Please enter correct arguments." << endl;
-        return 0;
-    }
-
-    // get paths
-    queue<string> paths;
-    for (int i = 2; i < argc; ++i)
-        paths.push(argv[i]);
-
-    current_position = 0;
-    max_disk_queue = stoi(argv[1]);
-    number_of_requesters = paths.size();
-    current_buffer_size = min(max_disk_queue, number_of_requesters);
-    requests = getRequests(paths);
-    
+    init(argc, argv);
     thread_libinit(startDiskScheduler, nullptr);
     return 0;
 }
