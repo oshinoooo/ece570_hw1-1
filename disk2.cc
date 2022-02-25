@@ -4,7 +4,6 @@
 #include <map>
 #include <fstream>
 #include <limits.h>
-#include <thread>
 
 #include "thread.h"
 #include "interrupt.h"
@@ -18,17 +17,19 @@ unsigned int available_buffer = 2;
 long current_position;
 long max_disk_queue;
 long number_of_requesters;
-//long specified_buffer_size;
 vector<queue<string>> requests;
 map<long, string> buffer;
 
 void printSchedulerState() {
-    cout << "----------------------------------------" << endl;
-    cout << "current_position     : " << current_position << endl;
-    cout << "number_of_requesters : " << number_of_requesters << endl;
-    //    cout << "specified_buffer_size: " << specified_buffer_size << endl;
-    cout << "buffer.size()        : " << buffer.size() << endl;
-    cout << "------------------------------" << endl;
+    cout << "========================================" << endl;
+    cout << "current_position      : " << current_position << endl;
+    cout << "max_disk_queue        : " << max_disk_queue << endl;
+    cout << "-------------------------" << endl;
+    cout << "number_of_requesters  : " << number_of_requesters << endl;
+    for (int i = 0; i < requests.size(); ++i)
+        cout << "requests[" << i << "].size()    : " << requests[i].size() << endl;
+    cout << "-------------------------" << endl;
+    cout << "buffer.size()         : " << buffer.size() << endl;
     for (const pair<long, string>& tmp : buffer)
         cout << "requester_id: " << tmp.first << ", track: " << tmp.second << endl;
     cout << "----------------------------------------" << endl;
@@ -62,13 +63,15 @@ void init(int argc, char* argv[]) {
         requests.push_back(tracks);
         paths.pop();
     }
+
+//    printSchedulerState();
 }
 
 void sendRequest(void* ptr) {
     thread_lock(lock);
 
     long requester_id = (long)ptr;
-    queue<string> tracks = requests[requester_id];
+    queue<string>& tracks = requests[requester_id];
 
     while (!tracks.empty()) {
         while(max_disk_queue <= buffer.size() || buffer.count(requester_id)) {
@@ -86,7 +89,7 @@ void sendRequest(void* ptr) {
         else
             thread_broadcast(lock, full_buffer);
 
-        //        printSchedulerState();
+//        printSchedulerState();
     }
 
     thread_unlock(lock);
@@ -121,13 +124,12 @@ void processRequest(void* ptr) {
         if (requests[requester_id].empty()) {
             --number_of_requesters;
             max_disk_queue = min(max_disk_queue, number_of_requesters);
-            //            cout << "===== " << requester_id << " quit =====" << endl;
         }
 
         if (max_disk_queue > buffer.size())
             thread_broadcast(lock, available_buffer);
 
-        //        printSchedulerState();
+//        printSchedulerState();
     }
 
     thread_unlock(lock);
