@@ -1,4 +1,5 @@
 cmake-build-debug
 .idea
-CMakeFiles
 disk
+a.out
+.DS_Store
