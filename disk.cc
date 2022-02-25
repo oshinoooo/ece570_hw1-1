@@ -5,8 +5,8 @@
 #include <fstream>
 #include <limits.h>
 
-#include "thread.h"
-#include "interrupt.h"
+#include "headers/thread.h"
+#include "headers/interrupt.h"
 
 using namespace std;
 
