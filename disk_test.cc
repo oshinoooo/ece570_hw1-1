@@ -11,8 +11,7 @@
 using namespace std;
 
 unsigned int lock = 0;
-unsigned int full_buffer = 1;
-unsigned int available_buffer = 2;
+unsigned int cond = 1;
 
 long current_position;
 long max_disk_queue;
@@ -75,7 +74,7 @@ void sendRequest(void* ptr) {
 
     while (!tracks.empty()) {
         while(max_disk_queue <= buffer.size() || buffer.count(requester_id)) {
-            thread_wait(lock, available_buffer);
+            thread_wait(lock, cond);
         }
 
         buffer.insert({requester_id, tracks.front()});
@@ -84,10 +83,7 @@ void sendRequest(void* ptr) {
 
         tracks.pop();
 
-        if (max_disk_queue > buffer.size())
-            thread_broadcast(lock, available_buffer);
-        else
-            thread_broadcast(lock, full_buffer);
+        thread_broadcast(lock, cond);
 
 //        printSchedulerState();
     }
@@ -100,7 +96,7 @@ void processRequest(void* ptr) {
 
     while (max_disk_queue > 0 || !buffer.empty()) {
         while(max_disk_queue > buffer.size()) {
-            thread_wait(lock, full_buffer);
+            thread_wait(lock, cond);
         }
 
         long requester_id;
@@ -126,8 +122,7 @@ void processRequest(void* ptr) {
             max_disk_queue = min(max_disk_queue, number_of_requesters);
         }
 
-        if (max_disk_queue > buffer.size())
-            thread_broadcast(lock, available_buffer);
+        thread_broadcast(lock, cond);
 
 //        printSchedulerState();
     }
